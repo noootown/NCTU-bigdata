@@ -1,0 +1,199 @@
+---
+title: "Big Data Hw1"
+author: "EECS 107 0310003 Hung I Chiu"
+date: "2017/3/16"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, cache = TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+```
+
+To TA:
+
+This report is made by R markdown, but since I had trouble with typing Chinese characters in R markdown, so I decided to hand in my report in an English version.
+
+Besides the data of December 2016 reaches almost 1 GB, my computer isn't good enough to handle much bigger dataset with R Language. I only analyze the data of December, 2016. Also, I think that the mean and tools to analyze won't varied even the dataset is Green or HLV or other months. 
+
+First of all, the folder is not a standard CSV extension file on account of the EOL -- end of line -- character. The standard CSV file has "\\n" as the EOL, but as for the dataset, it was a double comma such as ",,". Consequently, I have to open the file by vim and delete all the double commas before I read the data by R console.
+
+- pu_hour stands for pickup hour
+- do_hour stands for dropoff hour
+- distance stands for long or chort distance. I set the boundary at 15km because of my own experience.
+```{r read, include=TRUE, cache = TRUE}
+setwd('~/Downloads/')
+data <- tbl_df(read.table(file="./yellow.csv", header=TRUE, sep=","))
+
+data <- data %>%
+  mutate(
+    pu_hour = substr(as.character(tpep_pickup_datetime), 12, 13),
+    do_hour = substr(as.character(tpep_pickup_datetime), 12, 13),
+    distance = ifelse(trip_distance > 15, 1, 0)
+    )
+
+data %>% head(10)
+```
+
+### Q1
+What regions have most pickups and drop-offs?
+
+#### Pickup Region vs Count
+We can see that LocationID of 237 has the most pickup.
+```{r Q2-PU, include=TRUE, cache = TRUE}
+data %>%
+  group_by(PULocationID) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+```
+
+#### Dropoff Region vs Count
+We can see that LocationID of 236 has the most dropoff.
+```{r Q2-DO, include=TRUE, cache = TRUE}
+data %>%
+  group_by(DOLocationID) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+```
+
+#### (Pickup, Dropoff) Region vs Count
+According to the above and the below table, we can infer that 236 and 237 might be neighbors.
+```{r Q2-PU-DO, include=TRUE, cache = TRUE}
+data %>%
+  group_by(PULocationID, DOLocationID) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n))
+```
+
+\newpage
+
+### Q2
+When are the peak hours and off-peak hours in taking taxi?
+
+#### Pickup Hour vs Count
+The peak hours would be 18 ~ 19 o'clock, and the off-peak hours would be 0 ~ 7 o'clock
+```{r Q2-1, include=TRUE, cache = TRUE}
+data %>%
+  ggplot(aes(x=pu_hour)) +
+  geom_bar(fill = "red", alpha = 0.2) +
+  ggtitle("pickup hour vs count") +
+  labs(x="hour", y="n")
+```
+
+\newpage
+
+#### Dropoff Hour vs Count
+
+Same as above.
+```{r Q2-2, include=TRUE, cache = TRUE}
+data %>%
+  ggplot(aes(x=do_hour)) +
+  geom_bar(fill = "red", alpha = 0.2) +
+  ggtitle("dropoff hour vs count") +
+  labs(x="hour", y="n")
+```
+
+\newpage
+
+#### Q3
+What differences exist between short and long distance trips of taking taxi?
+
+I summarise columns that might have relation with distance.
+
+distance with 0 means <15km and with 1 means > 15km.
+```{r Q3-1, include=TRUE, cache = TRUE}
+data %>%
+  group_by(distance) %>%
+  summarise(
+    n= n(),
+    avg_passenger = mean(passenger_count),
+    avg_fare_amount = mean(fare_amount),
+    avg_total_amount = mean(total_amount)
+  )
+```
+\newpage
+
+Later, since average couldn't show the distribution of the data point, I make scatter plots of passenger_count, fare_count, total_amount.
+
+```{r Q3-2, include=TRUE, cache = TRUE}
+data %>%
+  sample_n(100000) %>%
+  ggplot(aes(x=as.factor(distance), y=passenger_count)) +
+  geom_point(alpha=0.2, size=1, color="red") +  
+  ggtitle("distance vs passenger_count") +
+  labs(x="distance", y="passenger_count")
+```
+
+\newpage
+
+```{r Q3-2-2, include=TRUE, cache = TRUE}
+data %>%
+  sample_n(100000) %>%
+  ggplot(aes(x=as.factor(distance), y=fare_amount)) +
+  geom_point(alpha=0.2, size=1, color="red") +  
+  ggtitle("distance vs fare_amount") +
+  labs(x="distance", y="fare_amount")
+```
+
+\newpage
+
+```{r Q3-2-3, include=TRUE, cache = TRUE}
+data %>%
+  sample_n(100000) %>%
+  ggplot(aes(x=as.factor(distance), y=total_amount)) +
+  geom_point(alpha=0.2, size=1, color="red") +  
+  ggtitle("distance vs total_amount") +
+  labs(x="distance", y="total_amount")
+```
+
+\newpage
+
+It's worth noting that the unit of y axis is percentage, not count. 
+```{r Q3-3, include=TRUE, cache = TRUE}
+data %>%
+  filter(distance == 0) %>%
+  ggplot(aes(x=payment_type)) +
+  geom_histogram(
+    aes(y=(..count..)/sum(..count..) * 100), bins=50, fill = "red", alpha = 0.2) +
+  ggtitle("payment type vs percentage (<=15km)") +
+  labs(x="payment type", y="percentage (%)")
+```
+
+\newpage
+
+```{r Q3-3-2, include=TRUE, cache = TRUE}
+data %>%
+  filter(distance == 1) %>%
+  ggplot(aes(x=payment_type)) +
+  geom_histogram(
+    aes(y=(..count..)/sum(..count..) * 100), bins=50, fill = "red", alpha = 0.2) +
+  ggtitle("payment type vs percentage (>15km)") +
+  labs(x="payment type", y="percentage (%)")
+```
+
+\newpage
+
+We can see that the pickup hour varies between long and short distance.
+```{r Q3-4, include=TRUE, cache = TRUE}
+data %>%
+  filter(distance == 0) %>%
+  ggplot(aes(x=factor(pu_hour))) +
+  geom_bar(aes(y=(..count..)/sum(..count..) * 100), fill = "red", alpha = 0.2) +
+  ggtitle("pickup hour vs percentage (<=15km)") +
+  facet_wrap("distance") +
+  labs(x="pickup hour", y="percentage")
+```
+
+\newpage
+
+```{r Q3-4-2, include=TRUE, cache = TRUE}
+data %>%
+  filter(distance == 1) %>%
+  ggplot(aes(x=factor(pu_hour))) +
+  geom_bar(aes(y=(..count..)/sum(..count..) * 100), fill = "red", alpha = 0.2) +
+  ggtitle("pickup hour vs percentage (>15km)") +
+  facet_wrap("distance") +
+  labs(x="pickup hour", y="percentage")
+```
